@@ -29,8 +29,8 @@ This process ensures that the student's question is appropriately contextualized
 Since bindings for Golang use sub-modules, need to clone repo as mentoined in instructions, build, and reference it: https://github.com/go-skynet/go-llama.cpp/tree/master
 
 ## To run
-go build .\
-./main (or go run .) -d {docs_path} -m {model_path} -p {prompt_path}\
+go build .  
+./main (or go run .) -d {docs_path} -m {model_path} -p {prompt_path}  
 
 
 
