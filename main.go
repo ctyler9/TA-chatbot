@@ -20,14 +20,14 @@ var loadedPrompt string
 var loadedModel *llama.LLama
 
 var keyOut = make(map[string]string)
-var channel = make(chan InputPayload, 1000)
+var channel = make(chan HTTPRequestPayload, 1000)
 
-type InputPayload struct {
+type HTTPRequestPayload struct {
 	idHash   string
 	question string
 }
 
-type SubmitResponse struct {
+type HTTPResponsePayload struct {
 	Message string `json:"message"`
 	ID      string `json:"id"`
 }
@@ -52,7 +52,6 @@ func parseKeyFromQuestion(question string) string {
 	}
 	return ""
 }
-
 func processDataFromChannel() {
 	for {
 		select {
@@ -62,8 +61,7 @@ func processDataFromChannel() {
 	}
 }
 
-func processPayload(payload InputPayload) {
-
+func processPayload(payload HTTPRequestPayload) {
 	id := payload.idHash
 	question := payload.question
 
@@ -88,6 +86,8 @@ func processPayload(payload InputPayload) {
 	// Write to global dict
 	keyOut[id] = out
 
+	fmt.Println("Finished writing output to keymap")
+
 }
 
 // HTTP HANDLERS
@@ -97,20 +97,21 @@ func submitData(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Printf("could not read body: %s\n", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 
-	out := string(body)
+	question := string(body)
 
-	// Add random noise to avoid collison if same question
+	// Add random noise to avoid collison if somehow same question
 	body = append(body, randomBytes(32)...)
 	hash := md5.Sum(body)
 	hashString := hex.EncodeToString(hash[:])
 
-	payload := InputPayload{hashString, out}
+	payload := HTTPRequestPayload{hashString, question}
 	channel <- payload
 
 	// Construct JSON response
-	response := SubmitResponse{
+	response := HTTPResponsePayload{
 		Message: "Data submitted successfully",
 		ID:      hashString,
 	}
@@ -126,14 +127,14 @@ func submitData(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(jsonResponse)
 
-	// Write response with success status code
-	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, "This is my website!\n")
+	fmt.Println("Request added to queue")
 
 }
 
 func getProcessedData(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
+
+	fmt.Println(keyOut)
 
 	// Check if the id exists in the keyOut map
 	if value, ok := keyOut[id]; ok {
@@ -165,6 +166,8 @@ func getProcessedData(w http.ResponseWriter, r *http.Request) {
 func main() {
 	loadInVars()
 
+	go processDataFromChannel()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/submit_data", submitData)
 	mux.HandleFunc("/get_processed_data", getProcessedData)
@@ -177,4 +180,5 @@ func main() {
 		fmt.Printf("error starting server: %s\n", err)
 		os.Exit(1)
 	}
+
 }
