@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,54 +14,65 @@ import (
 	"github.com/go-skynet/go-llama.cpp"
 )
 
-// Global vars
+// Global var init
 var loadedDocs *map[string]interface{}
 var loadedPrompt string
 var loadedModel *llama.LLama
 
-func readInPrompt(filePath string) (*string, error) {
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return nil, err
-	}
-	contentStr := string(content)
+var keyOut = make(map[string]string)
+var channel = make(chan InputPayload, 1000)
 
-	return &contentStr, err
+type InputPayload struct {
+	idHash   string
+	question string
 }
 
-func readInDocs(filePath string) (*map[string]interface{}, error) {
-	// Read json file
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		fmt.Println("Error reading file:", err)
-		return nil, err
-	}
-
-	// Define docs map to store key, val lookup
-	docs := make(map[string]interface{})
-
-	// load json file into map
-	if err := json.Unmarshal(content, &docs); err != nil {
-		fmt.Println("Error unmarshalling JSON:", err)
-		return nil, err
-	}
-
-	return &docs, nil
+type SubmitResponse struct {
+	Message string `json:"message"`
+	ID      string `json:"id"`
 }
 
-func processRequest(body []byte, docs *map[string]interface{}) string {
-	if docs == nil {
-		return ""
-	}
+type OutResponse struct {
+	Message string `json:"message"`
+	Data    string `json:"data,omitempty"`
+}
 
-	bodyStr := string(body)
-	key := parseKeyFromBody(bodyStr)
+// PROCESS REQUEST
+func filterOutput(output *string, strValue *string) {
+	// TODO: Still want to find most efficient way to do this
+}
+
+func parseKeyFromQuestion(question string) string {
+	for key := range *loadedDocs {
+		re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(key))
+
+		if re.MatchString(question) {
+			return key
+		}
+	}
+	return ""
+}
+
+func processDataFromChannel() {
+	for {
+		select {
+		case payload := <-channel:
+			processPayload(payload)
+		}
+	}
+}
+
+func processPayload(payload InputPayload) {
+
+	id := payload.idHash
+	question := payload.question
+
+	key := parseKeyFromQuestion(question)
 
 	var modelInput string
-	if value, ok := (*docs)[key]; ok {
+	if value, ok := (*loadedDocs)[key]; ok {
 		if strValue, ok := value.(string); ok {
-			modelInput = loadedPrompt + bodyStr + strValue
+			modelInput = loadedPrompt + question + strValue
 		}
 	}
 
@@ -69,31 +82,49 @@ func processRequest(body []byte, docs *map[string]interface{}) string {
 	if err != nil {
 		fmt.Println("ERROR predicting with model:", err)
 	}
+	// Once function implemented, prevent "leakage" of answers
+	//filteredOut := filterOutput(out)
 
-	return out
+	// Write to global dict
+	keyOut[id] = out
+
 }
 
-func parseKeyFromBody(bodyStr string) string {
-	for key := range *loadedDocs {
-		re := regexp.MustCompile(`(?i)` + regexp.QuoteMeta(key))
-
-		if re.MatchString(bodyStr) {
-			return key
-		}
-	}
-	return ""
-}
-
-func getRoot(w http.ResponseWriter, r *http.Request) {
+// HTTP HANDLERS
+func submitData(w http.ResponseWriter, r *http.Request) {
+	// Read in request
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		fmt.Printf("could not read body: %s\n", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 
-	out := processRequest(body, loadedDocs)
+	out := string(body)
 
-	fmt.Printf("got / request. Body: %s\n", out)
+	// Add random noise to avoid collison if same question
+	body = append(body, randomBytes(32)...)
+	hash := md5.Sum(body)
+	hashString := hex.EncodeToString(hash[:])
+
+	payload := InputPayload{hashString, out}
+	channel <- payload
+
+	// Construct JSON response
+	response := SubmitResponse{
+		Message: "Data submitted successfully",
+		ID:      hashString,
+	}
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		fmt.Printf("could not marshal JSON response: %s\n", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Write response with success status code and JSON body
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonResponse)
 
 	// Write response with success status code
 	w.WriteHeader(http.StatusOK)
@@ -101,37 +132,42 @@ func getRoot(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func loadInVars() {
-	// Call readInDocs function and assign the returned value to the global variable loadedDocs
-	docs, errDoc := readInDocs("./hw_docs.json")
-	if errDoc != nil {
-		fmt.Println("Error loading docs:", errDoc)
-		return
-	}
-	loadedDocs = docs
+func getProcessedData(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
 
-	// Read in Prompt
-	prompt, errPrompt := readInPrompt("./prompt.txt")
-	if errPrompt != nil {
-		fmt.Println("Error loading prompt:", errPrompt)
-		return
-	}
-	loadedPrompt = *prompt
+	// Check if the id exists in the keyOut map
+	if value, ok := keyOut[id]; ok {
+		response := OutResponse{
+			Message: "Success",
+			Data:    value,
+		}
+		jsonResponse, _ := json.Marshal(response)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(jsonResponse)
 
-	// Read in Model
-	model, errModel := constructModel("/home/ctyler/llm_models/mistral-7b-instruct-v0.2.Q3_K_S.gguf")
-	if errModel != nil {
-		fmt.Println("Error loading prompt:", errModel)
-		return
+		// Delete key/value pair once request sent
+		delete(keyOut, id)
+
+	} else {
+		// If id not found, inform the client
+		response := OutResponse{
+			Message: "Error",
+			Data:    fmt.Sprintf("ID %s not found", id),
+		}
+		jsonResponse, _ := json.Marshal(response)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(jsonResponse)
 	}
-	loadedModel = model
 }
 
 func main() {
 	loadInVars()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", getRoot)
+	mux.HandleFunc("/submit_data", submitData)
+	mux.HandleFunc("/get_processed_data", getProcessedData)
 
 	err := http.ListenAndServe(":8080", mux)
 
