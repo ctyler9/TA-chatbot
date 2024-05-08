@@ -39,9 +39,9 @@ func readInDocs(filePath string) (*map[string]interface{}, error) {
 	return &docs, nil
 }
 
-func loadInVars() {
+func loadInVars(docsPath string, promptPath string, modelPath string) {
 	// Call readInDocs function and assign the returned value to the global variable loadedDocs
-	docs, errDoc := readInDocs("./data/hw_docs.json")
+	docs, errDoc := readInDocs(docsPath)
 	if errDoc != nil {
 		fmt.Println("Error loading docs:", errDoc)
 		return
@@ -49,7 +49,7 @@ func loadInVars() {
 	loadedDocs = docs
 
 	// Read in Prompt
-	prompt, errPrompt := readInPrompt("./data/prompt.txt")
+	prompt, errPrompt := readInPrompt(promptPath)
 	if errPrompt != nil {
 		fmt.Println("Error loading prompt:", errPrompt)
 		return
@@ -57,7 +57,7 @@ func loadInVars() {
 	loadedPrompt = *prompt
 
 	// Read in Model
-	model, errModel := constructModel("/home/ctyler/llm_models/mistral-7b-instruct-v0.2.Q3_K_S.gguf")
+	model, errModel := constructModel(modelPath)
 	if errModel != nil {
 		fmt.Println("Error loading prompt:", errModel)
 		return

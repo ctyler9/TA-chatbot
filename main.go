@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -164,7 +165,12 @@ func getProcessedData(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	loadInVars()
+	// Define flags with default values
+	docsPath := flag.String("d", "./data/hw_docs.json", "Path to document map")
+	promptPath := flag.String("p", "./data/prompt.txt", "Path to prompt")
+	modelPath := flag.String("m", "", "Path to model")
+	flag.Parse()
+	loadInVars(*docsPath, *promptPath, *modelPath)
 
 	go processDataFromChannel()
 
