@@ -8,13 +8,13 @@ import (
 
 var (
 	threads   = 4
-	tokens    = 128
-	gpulayers = 0
+	tokens    = 32000
+	gpulayers = 1
 	seed      = -1
 )
 
 func constructModel(modelPath string) (*llama.LLama, error) {
-	l, err := llama.New(modelPath, llama.EnableF16Memory, llama.SetContext(128), llama.EnableEmbeddings, llama.SetGPULayers(gpulayers))
+	l, err := llama.New(modelPath, llama.EnableF16Memory, llama.SetContext(tokens), llama.EnableEmbeddings, llama.SetGPULayers(gpulayers))
 	if err != nil {
 		fmt.Println("Loading the model failed:", err.Error())
 		return nil, err
