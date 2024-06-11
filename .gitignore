@@ -1,3 +1,4 @@
 *.log
 main
 data/
+go-llama.cpp/

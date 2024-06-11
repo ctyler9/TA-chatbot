@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	threads   = 4
+	threads   = 32
 	tokens    = 32000
-	gpulayers = 1
+	gpulayers = 64
 	seed      = -1
 )
 
@@ -34,17 +34,17 @@ func predictModel(llm *llama.LLama, input string) (*string, error) {
 	return &out, nil
 }
 
-//]func main() {
-//]	llmModel, err := constructModel("/home/ctyler/llm_models/mistral-7b-instruct-v0.2.Q3_K_S.gguf")
-//]	if err != nil {
-//]		fmt.Println("Construct model error:", err)
-//]	}
-//]
-//]	out, errPred := predictModel(llmModel, "How are you today?")
-//]	if errPred != nil {
-//]		fmt.Println("Predict model error:", errPred)
-//]	}
-//]
-//]	fmt.Println(out)
-//]
-//]}
+//func main() {
+//	llmModel, err := constructModel("/home/ctyler/llm_models/mistral-7b-instruct-v0.2.Q3_K_S.gguf")
+//	if err != nil {
+//		fmt.Println("Construct model error:", err)
+//	}
+//
+//	out, errPred := predictModel(llmModel, "How are you today?")
+//	if errPred != nil {
+//		fmt.Println("Predict model error:", errPred)
+//	}
+//
+//	fmt.Println(*out)
+//
+//}

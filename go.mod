@@ -35,4 +35,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/go-skynet/go-llama.cpp => ../go-llama.cpp/
+replace github.com/go-skynet/go-llama.cpp => ./go-llama.cpp

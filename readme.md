@@ -28,7 +28,15 @@ This process ensures that the student's question is appropriately contextualized
 ## Installation
 Since bindings for Golang use sub-modules, need to clone repo as mentoined in instructions, build, and reference it: https://github.com/go-skynet/go-llama.cpp/tree/master
 
+## Build instructions 
+export CUDACXX=/usr/local/cuda/bin/nvcc
+
+CuBLAS:
+BUILD_TYPE=cublas make libbinding.a
+CGO_LDFLAGS="-lcublas -lcudart -L/usr/local/cuda/lib64/" LIBRARY_PATH=$PWD C_INCLUDE_PATH=$PWD go run ./examples -m "/model/path/here" -t 14
+
 ## To run
+
 go build .  
 ./main (or go run .) -d {docs_path} -m {model_path} -p {prompt_path}  
 
