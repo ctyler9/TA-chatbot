@@ -24,8 +24,8 @@ var keyOut = make(map[string]string)
 var channel = make(chan HTTPRequestPayload, 1000)
 
 type HTTPRequestPayload struct {
-	idHash   string
-	question string
+	IdHash   string
+	Question string
 }
 
 type HTTPResponsePayload struct {
@@ -63,15 +63,17 @@ func processDataFromChannel() {
 }
 
 func processPayload(payload HTTPRequestPayload) {
-	id := payload.idHash
-	question := payload.question
+	id := payload.IdHash
+	question := payload.Question
+
+	fmt.Println(question)
 
 	key := parseKeyFromQuestion(question)
 
 	var modelInput string
 	if value, ok := (*loadedDocs)[key]; ok {
 		if strValue, ok := value.(string); ok {
-			modelInput = loadedPrompt + question + strValue
+			modelInput = strValue + loadedPrompt + question
 		}
 	}
 
